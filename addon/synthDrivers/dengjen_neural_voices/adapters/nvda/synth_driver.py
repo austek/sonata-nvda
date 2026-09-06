@@ -48,7 +48,7 @@ from ...ports.tts_backend import BackendUnavailableError
 addonHandler.initTranslation()
 
 
-def _bootstrap_backend():
+def _bootstrap_backend():  # pragma: no cover
     """Construct and start the production TTS backend.
 
     A module-level function (not inline in SynthDriver.__init__) so tests can
