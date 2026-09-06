@@ -11,7 +11,7 @@ synthesis rather than the mocked grpc_client used everywhere in tests/.
 """
 
 import os
-import socket
+import re
 import subprocess
 import sys
 import tempfile
@@ -33,11 +33,25 @@ from tests_contract.conftest import BIN_DIRECTORY, GRPC_SERVER_EXE
 STARTUP_TIMEOUT = 15
 STARTUP_POLL_INTERVAL = 0.5
 
+_LISTENING_LINE_RE = re.compile(r"DENGJEN_GRPC_LISTENING port=(\d+)\r?\n")
 
-def _find_free_port():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("localhost", 0))
-        return s.getsockname()[1]
+
+def _wait_for_listening_port(process, log_path, timeout, poll_interval=0.05):
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            with open(log_path, "rb") as log_file:
+                content = log_file.read().decode(errors="replace")
+        except OSError:
+            content = ""
+        match = _LISTENING_LINE_RE.search(content)
+        if match:
+            return int(match.group(1))
+        if process.poll() is not None:
+            return None
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(poll_interval)
 
 
 @pytest.fixture(scope="session")
@@ -46,14 +60,13 @@ def grpc_server():
         f"dengjen-tts-grpc.exe not found at {GRPC_SERVER_EXE}"
     )
 
-    port = _find_free_port()
     log_path = os.path.join(tempfile.mkdtemp(), "dengjen-tts-grpc.log")
     env = os.environ.copy()
 
     espeakng_data_dir = os.path.dirname(espeakng_loader.get_data_path())
     env.update(
         {
-            "DENGJEN_GRPC_SERVER_PORT": str(port),
+            "DENGJEN_GRPC_SERVER_PORT": "0",
             "DENGJEN_ESPEAKNG_DATA_DIRECTORY": espeakng_data_dir,
             "DENGJEN_GRPC": "info",
         }
@@ -66,6 +79,21 @@ def grpc_server():
             env=env,
             stdout=log_file,
             stderr=subprocess.STDOUT,
+        )
+
+    port = _wait_for_listening_port(process, log_path, timeout=STARTUP_TIMEOUT)
+    if port is None:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        with open(log_path, "rb") as log_file:
+            server_log = log_file.read().decode(errors="replace")
+        pytest.fail(
+            f"dengjen-tts-grpc.exe did not report a listening port within "
+            f"{STARTUP_TIMEOUT}s (exit code: {process.poll()}).\n"
+            f"Server log:\n{server_log}"
         )
 
     channel = grpc.insecure_channel(f"localhost:{port}")
