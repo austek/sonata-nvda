@@ -1,5 +1,7 @@
 # Dengjen Neural Voices for NVDA
 
+[Project board](https://github.com/orgs/ZirekHQ/projects/1) — live roadmap and status for this repo's issues.
+
 > **Project history**
 >
 > Musharraf Omer ([@mush42](https://github.com/mush42)) created the original add-on and [announced on the NVDA Add-ons list](https://nvda-addons.groups.io/g/nvda-addons/message/27636) that commercial contract conflicts prevent him from continuing to maintain it. This project has continued it since, keeping the add-on working on current NVDA releases, with compatibility updates alongside bug fixes to the voice manager and the synthesizer driver. All credit for the original work belongs to Musharraf Omer.

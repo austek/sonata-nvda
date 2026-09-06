@@ -1,0 +1,13 @@
+name: Project sync
+
+on:
+  issues:
+    types: [opened, assigned]
+  pull_request:
+    types: [opened]
+
+jobs:
+  sync:
+    uses: ZirekHQ/.github/.github/workflows/project-sync.yml@main
+    secrets:
+      PROJECT_SYNC_TOKEN: ${{ secrets.PROJECT_SYNC_TOKEN }}
