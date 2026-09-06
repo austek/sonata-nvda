@@ -34,8 +34,8 @@ del _DIR, _ADDON_ROOT, _TTS_MODULE_DIR
 
 __all__ = [
     "DENGJEN_VOICES_DIR",
-    "DengjenTextToSpeechSystem",
     "DengjenGrpcBackend",
+    "DengjenTextToSpeechSystem",
     "aio",
     "helpers",
     "voice_migration",

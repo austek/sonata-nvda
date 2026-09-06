@@ -19,8 +19,8 @@ addonHandler.initTranslation()
 
 from . import (
     DENGJEN_VOICES_DIR,
-    DengjenTextToSpeechSystem,
     DengjenGrpcBackend,
+    DengjenTextToSpeechSystem,
     aio,
     helpers,
     voice_download,
