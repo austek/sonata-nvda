@@ -270,7 +270,7 @@ class DengjenTextToSpeechSystem:
 
     def shutdown(self):
         # No-op by design: the gRPC engine process outlives any single TTS
-        # system, so it is torn down by adapters/sonata_grpc's atexit
+        # system, so it is torn down by adapters/dengjen_grpc's atexit
         # handler instead.
         pass
 

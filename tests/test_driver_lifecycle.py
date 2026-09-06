@@ -21,7 +21,7 @@ _PKG_DIR = os.path.join(
     _TESTS_DIR, "..", "addon", "synthDrivers", "dengjen_neural_voices"
 )
 _AIO_PATH = os.path.join(_PKG_DIR, "aio.py")
-_GRPC_CLIENT_PATH = os.path.join(_PKG_DIR, "adapters", "sonata_grpc", "__init__.py")
+_GRPC_CLIENT_PATH = os.path.join(_PKG_DIR, "adapters", "dengjen_grpc", "__init__.py")
 _SHIM_INIT_PATH = os.path.join(_PKG_DIR, "__init__.py")
 _SYNTH_DRIVER_PATH = os.path.join(_PKG_DIR, "adapters", "nvda", "synth_driver.py")
 

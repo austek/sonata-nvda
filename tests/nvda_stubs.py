@@ -15,7 +15,7 @@ then drifts. Strategy, unchanged from before:
 3. Register `dengjen_neural_voices` in sys.modules WITHOUT running its
    __init__.py (which imports grpc_client at module level).
 4. Stub the intra-package submodules with platform deps (aio). The real
-   adapters.sonata_grpc needs no stub of its own: grpc and aio, its risky
+   adapters.dengjen_grpc needs no stub of its own: grpc and aio, its risky
    dependencies, are already stubbed here, so it imports for real.
 5. Load the real submodules under test (const, helpers, tts_system).
 6. With stub_wx=True, register `dengjen_tts_global_plugin` as a hollow
@@ -403,7 +403,7 @@ def install(*, stub_wx: bool = True) -> None:
         sys.path.insert(0, _GLOBAL_PLUGIN_DIR)
 
     if stub_wx:
-        import dengjen_neural_voices.adapters.sonata_grpc as _sonata_grpc
+        import dengjen_neural_voices.adapters.dengjen_grpc as _dengjen_grpc
 
         _gui_plugin_pkg = types.ModuleType("dengjen_tts_global_plugin")
         _gui_plugin_pkg.__path__ = [_GLOBAL_PLUGIN_PKG_DIR]
@@ -419,5 +419,5 @@ def install(*, stub_wx: bool = True) -> None:
             "dengjen_neural_voices.voice_migration"
         ]
         _gui_plugin_pkg.aio = _aio
-        _gui_plugin_pkg.SonataGrpcBackend = _sonata_grpc.SonataGrpcBackend
+        _gui_plugin_pkg.DengjenGrpcBackend = _dengjen_grpc.DengjenGrpcBackend
         sys.modules["dengjen_tts_global_plugin"] = _gui_plugin_pkg
