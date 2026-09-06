@@ -51,9 +51,9 @@ def test_check_version_wraps_a_failure_as_backend_unavailable(monkeypatch):
 
 
 def test_check_version_retries_once_after_a_failed_handshake_and_succeeds(monkeypatch):
-    """The retry this backend needs for a lost find_free_port() race
-    (#143): the first handshake fails, a fresh initialize() is attempted,
-    and the second handshake succeeds."""
+    """The retry this backend needs when the first handshake fails for
+    any transient reason (#143): a fresh initialize() is attempted, and
+    the second handshake succeeds."""
     attempts = []
 
     def _check_grpc_server():

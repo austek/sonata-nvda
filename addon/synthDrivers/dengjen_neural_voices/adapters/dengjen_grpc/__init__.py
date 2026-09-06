@@ -275,14 +275,12 @@ def terminate():
 async def _clear_stale_server_state():
     """Drop cached server/port/channel state after a failed readiness check.
 
-    start_grpc_server() caches the spawned process and its port in
-    globalVars as soon as Popen succeeds -- before anything confirms the
-    server actually bound that port and is answering RPCs. find_free_port()
-    closes its probe socket before the child starts, so another process can
-    claim the port in that gap; if that happens the child exits (or never
-    becomes reachable) and, without this, every later start_grpc_server()
-    call would keep reusing the same dead process and port forever, since
-    its cache check only looks at presence, not health.
+    start_grpc_server() caches the confirmed process and port in
+    globalVars once the server has bound and reported its port -- but a
+    server that was healthy at that point can still crash or hang later.
+    Without this, every later start_grpc_server() call would keep reusing
+    that same now-dead process and port forever, since its cache check
+    only looks at presence, not health.
 
     Also clears CHANNEL/DENGJEN_GRPC_SERVICE: initialize() reuses a cached
     CHANNEL outright when its loop still matches the running one, without
