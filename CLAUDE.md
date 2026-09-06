@@ -7,7 +7,7 @@
     - `domain/tts_system.py`'s `DengjenTextToSpeechSystem` manages voice/pitch/rate state and pulls chunks through `ports/tts_backend.py`'s `TTSBackend` protocol[cite: 3].
   - `addon/globalPlugins/dengjen_tts_global_plugin/`: Tray-menu voice manager GUI (imports directly from the synth driver package)[cite: 3].
   - `aio.py`: `AsyncEngine` singleton managing dedicated background thread, event loop, and thread pool for async gRPC calls[cite: 3].
-  - `adapters/dengjen_grpc/`: the `TTSBackend` adapter; spawns detached `dengjen-tts-grpc.exe` subprocess on a free port, explicitly validates `vcruntime140_1.dll` presence prior to spawn[cite: 3].
+  - `adapters/dengjen_grpc/`: the `TTSBackend` adapter; spawns detached `dengjen-tts-grpc.exe` subprocess on an OS-assigned port it reports back through its log, explicitly validates `vcruntime140_1.dll` presence prior to spawn[cite: 3].
   - `_config.py` & `voice_migration.py`: `DengjenConfig` persists per-voice configuration; migration handles legacy Sonata settings on first run[cite: 3].
 - **Vendored Dependencies**: Do NOT edit `lib/` directly; refresh native wheels via `update_grpc.py`, `update_miniaudio.py`, `update_cffi.py`[cite: 3].
 - **Build & Versioning**: SCons-driven (`scons`)[cite: 3]. Prefer configuring via `buildVars.py` before modifying `sconstruct`[cite: 3]. `addon_version` MUST be strict 3-part semver[cite: 3].

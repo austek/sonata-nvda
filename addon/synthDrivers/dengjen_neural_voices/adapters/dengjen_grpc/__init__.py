@@ -196,7 +196,10 @@ def start_grpc_server():
         log.exception(
             "Dengjen GRPC server did not report a listening port; killing it.",
         )
-        GRPC_SERVER_PROCESS.kill()
+        try:
+            GRPC_SERVER_PROCESS.kill()
+        except Exception:
+            log.debug("Failed to kill an unready GRPC server process", exc_info=True)
         GRPC_SERVER_PROCESS = None
         DENGJEN_GRPC_SERVER_PORT = None
         if SERVER_LOG_HANDLE is not None:
@@ -428,8 +431,8 @@ class DengjenGrpcBackend:
         except Exception:
             log.warning(
                 "Dengjen GRPC server was not ready on the first attempt "
-                "(possibly lost a port-bind race); retrying once with a "
-                "fresh subprocess.",
+                "(it did not report a port or answer the version handshake); "
+                "retrying once with a fresh subprocess.",
                 exc_info=True,
             )
             try:
