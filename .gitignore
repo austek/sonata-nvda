@@ -19,3 +19,4 @@ coverage.xml
 .scannerwork/
 .superpowers/
 uv.lock
+.worktrees/

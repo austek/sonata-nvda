@@ -3,7 +3,6 @@
 
 import contextlib
 import os
-import socket
 import sys
 
 import wx
@@ -21,23 +20,6 @@ def import_bundled_library(lib_directory=LIB_DIRECTORY):
         yield
     finally:
         sys.path.remove(lib_directory)
-
-
-def is_free_port(port):
-    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        try:
-            s.bind(("localhost", port))
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            return True
-        except OSError:
-            return False
-
-
-def find_free_port():
-    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("localhost", 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return s.getsockname()[1]
 
 
 def update_displaied_params_on_voice_change(synth):

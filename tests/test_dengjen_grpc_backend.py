@@ -51,9 +51,9 @@ def test_check_version_wraps_a_failure_as_backend_unavailable(monkeypatch):
 
 
 def test_check_version_retries_once_after_a_failed_handshake_and_succeeds(monkeypatch):
-    """The retry this backend needs for a lost find_free_port() race
-    (#143): the first handshake fails, a fresh initialize() is attempted,
-    and the second handshake succeeds."""
+    """The retry this backend needs when the first handshake fails for
+    any transient reason (#143): a fresh initialize() is attempted, and
+    the second handshake succeeds."""
     attempts = []
 
     def _check_grpc_server():
@@ -196,8 +196,8 @@ def test_synthesize_yields_audio_bytes_not_the_raw_message():
 
 class TestClearStaleServerState:
     """_clear_stale_server_state() is the recovery path for a server that
-    Popen'd successfully but never became reachable (e.g. lost the
-    find_free_port()-to-bind race to another process) -- without it, every
+    Popen'd successfully but never became reachable (e.g. crashed after
+    binding, or hung before answering RPCs) -- without it, every
     later start_grpc_server()/initialize() call would keep reusing the same
     dead process, port and channel forever, since their cache checks only
     look at presence, not health.
@@ -363,3 +363,85 @@ def test_check_grpc_server_clears_stale_state_when_the_handshake_fails():
 
     assert killed.value
     assert mod.GRPC_SERVER_PROCESS is None
+
+
+class TestWaitForListeningPort:
+    def test_returns_the_port_once_the_log_contains_the_handshake_line(self, tmp_path):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"DENGJEN_GRPC_LISTENING port=49314\n")
+        process = types.SimpleNamespace(poll=lambda: None)
+
+        port = dengjen_grpc._wait_for_listening_port(process, str(log_path), timeout=1)
+
+        assert port == 49314
+
+    def test_ignores_unrelated_log_lines_before_the_handshake_appears(self, tmp_path):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(
+            b"[INFO] starting up\n"
+            b"[INFO] loading onnxruntime\n"
+            b"DENGJEN_GRPC_LISTENING port=51000\n"
+        )
+        process = types.SimpleNamespace(poll=lambda: None)
+
+        port = dengjen_grpc._wait_for_listening_port(process, str(log_path), timeout=1)
+
+        assert port == 51000
+
+    def test_does_not_match_a_partially_written_line_without_a_trailing_newline(
+        self, tmp_path
+    ):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"DENGJEN_GRPC_LISTENING port=493")
+        process = types.SimpleNamespace(poll=lambda: None)
+
+        with pytest.raises(TimeoutError):
+            dengjen_grpc._wait_for_listening_port(
+                process, str(log_path), timeout=0.1, poll_interval=0.02
+            )
+
+    def test_raises_timeout_error_when_the_line_never_appears(self, tmp_path):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"")
+        process = types.SimpleNamespace(poll=lambda: None)
+
+        with pytest.raises(TimeoutError):
+            dengjen_grpc._wait_for_listening_port(
+                process, str(log_path), timeout=0.1, poll_interval=0.02
+            )
+
+    def test_raises_runtime_error_when_the_process_exits_before_reporting(
+        self, tmp_path
+    ):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"")
+        process = types.SimpleNamespace(poll=lambda: 1)
+
+        with pytest.raises(RuntimeError, match="exit code: 1"):
+            dengjen_grpc._wait_for_listening_port(process, str(log_path), timeout=1)
+
+    def test_raises_runtime_error_immediately_without_waiting_out_the_timeout(
+        self, tmp_path
+    ):
+        """The process already died -- must not wait out the full timeout budget."""
+        import time
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"")
+        process = types.SimpleNamespace(poll=lambda: 1)
+
+        start = time.monotonic()
+        with pytest.raises(RuntimeError):
+            dengjen_grpc._wait_for_listening_port(process, str(log_path), timeout=5)
+        assert time.monotonic() - start < 1

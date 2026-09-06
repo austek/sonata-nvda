@@ -2,6 +2,7 @@ import asyncio
 import atexit
 import ctypes
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -61,7 +62,7 @@ def _show_vcruntime_warning():
 
 
 from ...const import DENGJEN_VOICES_BASE_DIR
-from ...helpers import BIN_DIRECTORY, find_free_port, import_bundled_library
+from ...helpers import BIN_DIRECTORY, import_bundled_library
 from ...ports.tts_backend import (
     BackendUnavailableError,
     LoadedVoice,
@@ -89,6 +90,42 @@ SERVER_CHECK_TIMEOUT = 15
 STARTUP_TIMEOUT = SERVER_CHECK_TIMEOUT + 5
 CALL_TIMEOUT = 10
 CHANNEL_CLOSE_TIMEOUT = 5
+PORT_HANDSHAKE_TIMEOUT = 10
+
+
+_LISTENING_LINE_RE = re.compile(r"DENGJEN_GRPC_LISTENING port=(\d+)\r?\n")
+
+
+def _wait_for_listening_port(process, log_path, timeout=None, poll_interval=0.05):
+    """Poll the server's log file for its handshake line and return the port.
+
+    Requires the trailing newline in the match so a line still being
+    flushed mid-write can't be read as a complete, truncated port number.
+    """
+    if timeout is None:
+        timeout = PORT_HANDSHAKE_TIMEOUT
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            with open(log_path, "rb") as log_file:
+                content = log_file.read().decode(errors="replace")
+        except OSError:
+            content = ""
+        match = _LISTENING_LINE_RE.search(content)
+        if match:
+            return int(match.group(1))
+        exit_code = process.poll()
+        if exit_code is not None:
+            raise RuntimeError(
+                "dengjen-tts-grpc.exe exited before reporting its listening "
+                f"port (exit code: {exit_code})"
+            )
+        if time.monotonic() >= deadline:
+            raise TimeoutError(
+                f"dengjen-tts-grpc.exe did not report its listening port "
+                f"within {timeout}s"
+            )
+        time.sleep(poll_interval)
 
 
 def start_grpc_server():
@@ -105,13 +142,12 @@ def start_grpc_server():
         )
         _show_vcruntime_warning()
         return False
-    DENGJEN_GRPC_SERVER_PORT = find_free_port()
     grpc_server_exe = os.path.join(BIN_DIRECTORY, "dengjen-tts-grpc.exe")
     nvda_espeak_dir = os.path.join(globalVars.appDir, "synthDrivers")
     env = os.environ.copy()
     env.update(
         {
-            "DENGJEN_GRPC_SERVER_PORT": str(DENGJEN_GRPC_SERVER_PORT),
+            "DENGJEN_GRPC_SERVER_PORT": "0",
             "DENGJEN_ESPEAKNG_DATA_DIRECTORY": os.fspath(nvda_espeak_dir),
             "DENGJEN_GRPC": "info",
         }
@@ -128,8 +164,12 @@ def start_grpc_server():
         Path(server_log_file).parent.mkdir(parents=True, exist_ok=True)
         server_stdout = SERVER_LOG_HANDLE = open(server_log_file, "wb")  # noqa: SIM115
     except OSError:
-        log.exception("Failed to open server log file for writing", exc_info=True)
-        server_stdout = subprocess.DEVNULL
+        log.exception(
+            "Failed to open server log file for writing; cannot confirm the "
+            "Dengjen GRPC server's listening port without it.",
+            exc_info=True,
+        )
+        return False
     try:
         GRPC_SERVER_PROCESS = subprocess.Popen(
             args=grpc_server_exe,
@@ -144,6 +184,24 @@ def start_grpc_server():
             "Failed to start Dengjen GRPC server. The synth will not be available.",
             exc_info=True,
         )
+        if SERVER_LOG_HANDLE is not None:
+            SERVER_LOG_HANDLE.close()
+            SERVER_LOG_HANDLE = None
+        return False
+    try:
+        DENGJEN_GRPC_SERVER_PORT = _wait_for_listening_port(
+            GRPC_SERVER_PROCESS, server_log_file
+        )
+    except Exception:
+        log.exception(
+            "Dengjen GRPC server did not report a listening port; killing it.",
+        )
+        try:
+            GRPC_SERVER_PROCESS.kill()
+        except Exception:
+            log.debug("Failed to kill an unready GRPC server process", exc_info=True)
+        GRPC_SERVER_PROCESS = None
+        DENGJEN_GRPC_SERVER_PORT = None
         if SERVER_LOG_HANDLE is not None:
             SERVER_LOG_HANDLE.close()
             SERVER_LOG_HANDLE = None
@@ -220,14 +278,12 @@ def terminate():
 async def _clear_stale_server_state():
     """Drop cached server/port/channel state after a failed readiness check.
 
-    start_grpc_server() caches the spawned process and its port in
-    globalVars as soon as Popen succeeds -- before anything confirms the
-    server actually bound that port and is answering RPCs. find_free_port()
-    closes its probe socket before the child starts, so another process can
-    claim the port in that gap; if that happens the child exits (or never
-    becomes reachable) and, without this, every later start_grpc_server()
-    call would keep reusing the same dead process and port forever, since
-    its cache check only looks at presence, not health.
+    start_grpc_server() caches the confirmed process and port in
+    globalVars once the server has bound and reported its port -- but a
+    server that was healthy at that point can still crash or hang later.
+    Without this, every later start_grpc_server() call would keep reusing
+    that same now-dead process and port forever, since its cache check
+    only looks at presence, not health.
 
     Also clears CHANNEL/DENGJEN_GRPC_SERVICE: initialize() reuses a cached
     CHANNEL outright when its loop still matches the running one, without
@@ -375,8 +431,8 @@ class DengjenGrpcBackend:
         except Exception:
             log.warning(
                 "Dengjen GRPC server was not ready on the first attempt "
-                "(possibly lost a port-bind race); retrying once with a "
-                "fresh subprocess.",
+                "(it did not report a port or answer the version handshake); "
+                "retrying once with a fresh subprocess.",
                 exc_info=True,
             )
             try:
