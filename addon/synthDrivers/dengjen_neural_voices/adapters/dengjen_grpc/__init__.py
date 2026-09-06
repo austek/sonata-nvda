@@ -62,7 +62,7 @@ def _show_vcruntime_warning():
 
 
 from ...const import DENGJEN_VOICES_BASE_DIR
-from ...helpers import BIN_DIRECTORY, find_free_port, import_bundled_library
+from ...helpers import BIN_DIRECTORY, import_bundled_library
 from ...ports.tts_backend import (
     BackendUnavailableError,
     LoadedVoice,
@@ -142,13 +142,12 @@ def start_grpc_server():
         )
         _show_vcruntime_warning()
         return False
-    DENGJEN_GRPC_SERVER_PORT = find_free_port()
     grpc_server_exe = os.path.join(BIN_DIRECTORY, "dengjen-tts-grpc.exe")
     nvda_espeak_dir = os.path.join(globalVars.appDir, "synthDrivers")
     env = os.environ.copy()
     env.update(
         {
-            "DENGJEN_GRPC_SERVER_PORT": str(DENGJEN_GRPC_SERVER_PORT),
+            "DENGJEN_GRPC_SERVER_PORT": "0",
             "DENGJEN_ESPEAKNG_DATA_DIRECTORY": os.fspath(nvda_espeak_dir),
             "DENGJEN_GRPC": "info",
         }
@@ -165,8 +164,12 @@ def start_grpc_server():
         Path(server_log_file).parent.mkdir(parents=True, exist_ok=True)
         server_stdout = SERVER_LOG_HANDLE = open(server_log_file, "wb")  # noqa: SIM115
     except OSError:
-        log.exception("Failed to open server log file for writing", exc_info=True)
-        server_stdout = subprocess.DEVNULL
+        log.exception(
+            "Failed to open server log file for writing; cannot confirm the "
+            "Dengjen GRPC server's listening port without it.",
+            exc_info=True,
+        )
+        return False
     try:
         GRPC_SERVER_PROCESS = subprocess.Popen(
             args=grpc_server_exe,
@@ -181,6 +184,21 @@ def start_grpc_server():
             "Failed to start Dengjen GRPC server. The synth will not be available.",
             exc_info=True,
         )
+        if SERVER_LOG_HANDLE is not None:
+            SERVER_LOG_HANDLE.close()
+            SERVER_LOG_HANDLE = None
+        return False
+    try:
+        DENGJEN_GRPC_SERVER_PORT = _wait_for_listening_port(
+            GRPC_SERVER_PROCESS, server_log_file
+        )
+    except Exception:
+        log.exception(
+            "Dengjen GRPC server did not report a listening port; killing it.",
+        )
+        GRPC_SERVER_PROCESS.kill()
+        GRPC_SERVER_PROCESS = None
+        DENGJEN_GRPC_SERVER_PORT = None
         if SERVER_LOG_HANDLE is not None:
             SERVER_LOG_HANDLE.close()
             SERVER_LOG_HANDLE = None
