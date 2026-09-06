@@ -6,9 +6,9 @@ allow-eval = true
 [tool.ruff]
 extend-exclude = [
     "addon/synthDrivers/dengjen_neural_voices/lib",
-    "addon/synthDrivers/dengjen_neural_voices/adapters/sonata_grpc/grpc_protos/dengjen_grpc_pb2.py",
-    "addon/synthDrivers/dengjen_neural_voices/adapters/sonata_grpc/grpc_protos/dengjen_grpc_pb2.pyi",
-    "addon/synthDrivers/dengjen_neural_voices/adapters/sonata_grpc/grpc_protos/dengjen_grpc_pb2_grpc.py",
+    "addon/synthDrivers/dengjen_neural_voices/adapters/dengjen_grpc/grpc_protos/dengjen_grpc_pb2.py",
+    "addon/synthDrivers/dengjen_neural_voices/adapters/dengjen_grpc/grpc_protos/dengjen_grpc_pb2.pyi",
+    "addon/synthDrivers/dengjen_neural_voices/adapters/dengjen_grpc/grpc_protos/dengjen_grpc_pb2_grpc.py",
     
     
     "addon/globalPlugins/dengjen_tts_global_plugin/sized_controls.py",

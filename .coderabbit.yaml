@@ -43,7 +43,7 @@ reviews:
         - Verify shutdown/teardown paths actually stop the loop and join the thread; a leaked thread keeps NVDA from exiting cleanly.
 
     # 3. gRPC client & subprocess management
-    - path: "addon/synthDrivers/dengjen_neural_voices/adapters/sonata_grpc/**"
+    - path: "addon/synthDrivers/dengjen_neural_voices/adapters/dengjen_grpc/**"
       instructions: |
         - The dengjen-tts-grpc.exe subprocess is spawned detached on a free port; verify port selection has no race and the process handle/stdout/stderr are closed or piped without leaking file descriptors.
         - Confirm the vcruntime140_1.dll presence check happens before every spawn attempt, with a clear user-facing error if missing, not a raw crash.
