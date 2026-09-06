@@ -2,6 +2,7 @@ import asyncio
 import atexit
 import ctypes
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -89,6 +90,42 @@ SERVER_CHECK_TIMEOUT = 15
 STARTUP_TIMEOUT = SERVER_CHECK_TIMEOUT + 5
 CALL_TIMEOUT = 10
 CHANNEL_CLOSE_TIMEOUT = 5
+PORT_HANDSHAKE_TIMEOUT = 10
+
+
+_LISTENING_LINE_RE = re.compile(r"DENGJEN_GRPC_LISTENING port=(\d+)\r?\n")
+
+
+def _wait_for_listening_port(process, log_path, timeout=None, poll_interval=0.05):
+    """Poll the server's log file for its handshake line and return the port.
+
+    Requires the trailing newline in the match so a line still being
+    flushed mid-write can't be read as a complete, truncated port number.
+    """
+    if timeout is None:
+        timeout = PORT_HANDSHAKE_TIMEOUT
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            with open(log_path, "rb") as log_file:
+                content = log_file.read().decode(errors="replace")
+        except OSError:
+            content = ""
+        match = _LISTENING_LINE_RE.search(content)
+        if match:
+            return int(match.group(1))
+        exit_code = process.poll()
+        if exit_code is not None:
+            raise RuntimeError(
+                "dengjen-tts-grpc.exe exited before reporting its listening "
+                f"port (exit code: {exit_code})"
+            )
+        if time.monotonic() >= deadline:
+            raise TimeoutError(
+                f"dengjen-tts-grpc.exe did not report its listening port "
+                f"within {timeout}s"
+            )
+        time.sleep(poll_interval)
 
 
 def start_grpc_server():

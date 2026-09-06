@@ -363,3 +363,85 @@ def test_check_grpc_server_clears_stale_state_when_the_handshake_fails():
 
     assert killed.value
     assert mod.GRPC_SERVER_PROCESS is None
+
+
+class TestWaitForListeningPort:
+    def test_returns_the_port_once_the_log_contains_the_handshake_line(self, tmp_path):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"DENGJEN_GRPC_LISTENING port=49314\n")
+        process = types.SimpleNamespace(poll=lambda: None)
+
+        port = dengjen_grpc._wait_for_listening_port(process, str(log_path), timeout=1)
+
+        assert port == 49314
+
+    def test_ignores_unrelated_log_lines_before_the_handshake_appears(self, tmp_path):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(
+            b"[INFO] starting up\n"
+            b"[INFO] loading onnxruntime\n"
+            b"DENGJEN_GRPC_LISTENING port=51000\n"
+        )
+        process = types.SimpleNamespace(poll=lambda: None)
+
+        port = dengjen_grpc._wait_for_listening_port(process, str(log_path), timeout=1)
+
+        assert port == 51000
+
+    def test_does_not_match_a_partially_written_line_without_a_trailing_newline(
+        self, tmp_path
+    ):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"DENGJEN_GRPC_LISTENING port=493")
+        process = types.SimpleNamespace(poll=lambda: None)
+
+        with pytest.raises(TimeoutError):
+            dengjen_grpc._wait_for_listening_port(
+                process, str(log_path), timeout=0.1, poll_interval=0.02
+            )
+
+    def test_raises_timeout_error_when_the_line_never_appears(self, tmp_path):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"")
+        process = types.SimpleNamespace(poll=lambda: None)
+
+        with pytest.raises(TimeoutError):
+            dengjen_grpc._wait_for_listening_port(
+                process, str(log_path), timeout=0.1, poll_interval=0.02
+            )
+
+    def test_raises_runtime_error_when_the_process_exits_before_reporting(
+        self, tmp_path
+    ):
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"")
+        process = types.SimpleNamespace(poll=lambda: 1)
+
+        with pytest.raises(RuntimeError, match="exit code: 1"):
+            dengjen_grpc._wait_for_listening_port(process, str(log_path), timeout=1)
+
+    def test_raises_runtime_error_immediately_without_waiting_out_the_timeout(
+        self, tmp_path
+    ):
+        """The process already died -- must not wait out the full timeout budget."""
+        import time
+        import types
+
+        log_path = tmp_path / "server.log"
+        log_path.write_bytes(b"")
+        process = types.SimpleNamespace(poll=lambda: 1)
+
+        start = time.monotonic()
+        with pytest.raises(RuntimeError):
+            dengjen_grpc._wait_for_listening_port(process, str(log_path), timeout=5)
+        assert time.monotonic() - start < 1
