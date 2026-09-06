@@ -354,8 +354,9 @@ def test_check_grpc_server_clears_stale_state_when_the_handshake_fails():
     mod.get_dengjen_version = _boom
     mod.GRPC_SERVER_PROCESS = fake_process
     try:
+        coro = mod.check_grpc_server()
         with pytest.raises(RuntimeError):
-            asyncio.run(mod.check_grpc_server())
+            asyncio.run(coro)
     finally:
         mod.get_dengjen_version = orig_get_version
         mod.GRPC_SERVER_PROCESS = orig_process
