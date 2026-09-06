@@ -1,4 +1,5 @@
 * xref:index.adoc[Overview]
+* xref:architecture.adoc[Architecture]
 * xref:installation.adoc[Installation]
 * xref:usage.adoc[Usage]
 * xref:troubleshooting.adoc[Troubleshooting]

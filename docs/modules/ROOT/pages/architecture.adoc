@@ -1,0 +1,86 @@
+= Architecture
+
+This page shows dengjen-nvda's own structure as a https://c4model.com/[C4]
+Container, Component, and Code diagram. For how it fits into the wider
+ZirekHQ speech stack, see the
+https://zirekhq.github.io/en/home/architecture.html[org-wide System Context
+diagram].
+
+== Container
+
+dengjen-nvda is not one process but two: NVDA loads the add-on itself
+in-process, and the add-on launches a vendored, separately-built
+`dengjen-tts-grpc.exe` binary (a dengjen-tts frontend) as its own subprocess,
+talking to it over gRPC.
+
+[source,mermaid]
+----
+C4Container
+    System_Ext(nvda, "NVDA", "The screen reader host process")
+
+    System_Boundary(addon, "dengjen-nvda") {
+        Container(synthdriver, "dengjen_neural_voices", "Python 3.13 add-on", "Loaded in-process by NVDA as a synthesizer driver")
+        Container(grpcbin, "dengjen-tts-grpc.exe", "Vendored Rust binary", "Launched via subprocess.Popen; a gRPC-frontend build of dengjen-tts")
+    }
+
+    System_Ext(voices, "Voice catalogue", "External download source for voices")
+
+    Rel(nvda, synthdriver, "Loads / calls SynthDriver API")
+    Rel(synthdriver, grpcbin, "Launches, then calls over gRPC")
+    Rel(synthdriver, voices, "Downloads voices from")
+----
+
+== Component
+
+The add-on itself is a small hexagonal (ports-and-adapters) design: domain
+logic that knows nothing about NVDA or gRPC, one seam (`TTSBackend`) that any
+synthesis backend must satisfy, and two adapters either side of that seam.
+
+[source,mermaid]
+----
+C4Component
+    Container_Boundary(addon, "dengjen_neural_voices") {
+        Component(domain, "domain/tts_system.py", "Python module", "Pure domain logic: voices, speech options. No gRPC, no NVDA imports.")
+        Component(port, "ports/tts_backend.py", "Python Protocol", "TTSBackend -- the one interface a TTS engine adapter must satisfy")
+        Component(grpcadapter, "adapters/sonata_grpc", "Python package", "Implements TTSBackend by launching and talking to dengjen-tts-grpc.exe")
+        Component(nvdaadapter, "adapters/nvda/synth_driver.py", "Python module", "Exposes the domain layer to NVDA's own SynthDriver API")
+    }
+
+    Rel(nvdaadapter, domain, "Creates/manages DengjenVoice")
+    Rel(domain, port, "Calls self.backend, typed as")
+    Rel(grpcadapter, port, "Implements")
+----
+
+== Code
+
+`TTSBackend` is a `Protocol`, not a base class -- the `sonata_grpc` adapter
+satisfies it structurally. Its methods are split deliberately: everything NVDA
+calls synchronously from its main thread has to stay blocking; only
+`synthesize()` is a true async generator.
+
+[source,mermaid]
+----
+classDiagram
+    class TTSBackend {
+        <<Protocol>>
+        +initialize()
+        +check_version()
+        +shutdown()
+        +load_voice()
+        +get_synth_options()
+        +set_synth_options()
+        +synthesize() AsyncIterator~bytes~
+    }
+    class SynthOptions {
+        <<frozen dataclass>>
+    }
+    class LoadedVoice {
+        <<frozen dataclass>>
+    }
+    class SonataGrpcBackend
+
+    TTSBackend <|.. SonataGrpcBackend
+    TTSBackend ..> SynthOptions : passes
+    TTSBackend ..> LoadedVoice : returns
+    note for SonataGrpcBackend "Implements TTSBackend by launching and calling dengjen-tts-grpc.exe"
+----
