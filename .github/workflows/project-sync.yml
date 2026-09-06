@@ -6,8 +6,10 @@ on:
   pull_request:
     types: [opened]
 
+permissions: {}
+
 jobs:
   sync:
-    uses: ZirekHQ/.github/.github/workflows/project-sync.yml@main
+    uses: ZirekHQ/.github/.github/workflows/project-sync.yml@576ae213e3574b3b0ff5bf46bcfc8e3956fd620d # main
     secrets:
       PROJECT_SYNC_TOKEN: ${{ secrets.PROJECT_SYNC_TOKEN }}
