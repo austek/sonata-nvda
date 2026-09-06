@@ -1,5 +1,5 @@
 """
-Tests for SonataGrpcBackend's TTSBackend surface: that it correctly
+Tests for DengjenGrpcBackend's TTSBackend surface: that it correctly
 translates the underlying module-level gRPC calls' failures into the
 TTSBackend port's typed errors. The gRPC calls themselves (against a real
 dengjen-tts-grpc.exe) are covered by tests_contract/, not here.
@@ -8,14 +8,14 @@ dengjen-tts-grpc.exe) are covered by tests_contract/, not here.
 from concurrent.futures import Future
 
 import pytest
-from dengjen_neural_voices.adapters import sonata_grpc
+from dengjen_neural_voices.adapters import dengjen_grpc
 from dengjen_neural_voices.ports.tts_backend import (
     BackendUnavailableError,
     SynthesisError,
     VoiceLoadError,
 )
 
-backend = sonata_grpc.SonataGrpcBackend()
+backend = dengjen_grpc.DengjenGrpcBackend()
 
 
 def _failed_future(exc):
@@ -32,7 +32,7 @@ def _resolved_future(value):
 
 def test_initialize_wraps_a_failure_as_backend_unavailable(monkeypatch):
     monkeypatch.setattr(
-        sonata_grpc, "initialize", lambda: _failed_future(RuntimeError("no port"))
+        dengjen_grpc, "initialize", lambda: _failed_future(RuntimeError("no port"))
     )
     with pytest.raises(BackendUnavailableError):
         backend.initialize()
@@ -41,10 +41,10 @@ def test_initialize_wraps_a_failure_as_backend_unavailable(monkeypatch):
 def test_check_version_wraps_a_failure_as_backend_unavailable(monkeypatch):
 
     monkeypatch.setattr(
-        sonata_grpc, "check_grpc_server", lambda: _failed_future(TimeoutError())
+        dengjen_grpc, "check_grpc_server", lambda: _failed_future(TimeoutError())
     )
     monkeypatch.setattr(
-        sonata_grpc, "initialize", lambda: _failed_future(RuntimeError("no port"))
+        dengjen_grpc, "initialize", lambda: _failed_future(RuntimeError("no port"))
     )
     with pytest.raises(BackendUnavailableError):
         backend.check_version()
@@ -62,8 +62,8 @@ def test_check_version_retries_once_after_a_failed_handshake_and_succeeds(monkey
             return _failed_future(TimeoutError())
         return _resolved_future("1.2.3")
 
-    monkeypatch.setattr(sonata_grpc, "check_grpc_server", _check_grpc_server)
-    monkeypatch.setattr(sonata_grpc, "initialize", lambda: _resolved_future(None))
+    monkeypatch.setattr(dengjen_grpc, "check_grpc_server", _check_grpc_server)
+    monkeypatch.setattr(dengjen_grpc, "initialize", lambda: _resolved_future(None))
 
     assert backend.check_version() == "1.2.3"
     assert len(attempts) == 2
@@ -80,8 +80,8 @@ def test_check_version_gives_up_as_backend_unavailable_after_one_failed_retry(
         attempts.append(None)
         return _failed_future(TimeoutError())
 
-    monkeypatch.setattr(sonata_grpc, "check_grpc_server", _check_grpc_server)
-    monkeypatch.setattr(sonata_grpc, "initialize", lambda: _resolved_future(None))
+    monkeypatch.setattr(dengjen_grpc, "check_grpc_server", _check_grpc_server)
+    monkeypatch.setattr(dengjen_grpc, "initialize", lambda: _resolved_future(None))
 
     with pytest.raises(BackendUnavailableError):
         backend.check_version()
@@ -91,7 +91,7 @@ def test_check_version_gives_up_as_backend_unavailable_after_one_failed_retry(
 
 def test_load_voice_wraps_a_failure_as_voice_load_error(monkeypatch):
     monkeypatch.setattr(
-        sonata_grpc,
+        dengjen_grpc,
         "load_voice",
         lambda path: _failed_future(RuntimeError("bad proto")),
     )
@@ -117,7 +117,7 @@ def test_load_voice_maps_the_response_fields(monkeypatch):
 
     ready = Future()
     ready.set_result(_FakeInfo())
-    monkeypatch.setattr(sonata_grpc, "load_voice", lambda path: ready)
+    monkeypatch.setattr(dengjen_grpc, "load_voice", lambda path: ready)
 
     loaded = backend.load_voice("/tmp/v/config.json")
 
@@ -129,7 +129,7 @@ def test_load_voice_maps_the_response_fields(monkeypatch):
 
 def test_set_synth_options_wraps_a_failure_as_voice_load_error(monkeypatch):
     monkeypatch.setattr(
-        sonata_grpc,
+        dengjen_grpc,
         "set_synth_options",
         lambda voice_id, **kw: _failed_future(RuntimeError("boom")),
     )
@@ -151,7 +151,7 @@ def test_synthesize_wraps_a_failure_as_synthesis_error():
             ):
                 pass
 
-    import dengjen_neural_voices.adapters.sonata_grpc as mod
+    import dengjen_neural_voices.adapters.dengjen_grpc as mod
 
     orig = mod.speak
     mod.speak = _boom
@@ -182,7 +182,7 @@ def test_synthesize_yields_audio_bytes_not_the_raw_message():
             )
         ]
 
-    import dengjen_neural_voices.adapters.sonata_grpc as mod
+    import dengjen_neural_voices.adapters.dengjen_grpc as mod
 
     orig = mod.speak
     mod.speak = _fake_speak
@@ -216,14 +216,14 @@ class TestClearStaleServerState:
         fake_process = types.SimpleNamespace(
             kill=lambda: setattr(killed, "value", True)
         )
-        monkeypatch.setattr(sonata_grpc, "GRPC_SERVER_PROCESS", fake_process)
-        monkeypatch.setattr(sonata_grpc, "SONATA_GRPC_SERVER_PORT", 12345)
+        monkeypatch.setattr(dengjen_grpc, "GRPC_SERVER_PROCESS", fake_process)
+        monkeypatch.setattr(dengjen_grpc, "DENGJEN_GRPC_SERVER_PORT", 12345)
 
-        asyncio.run(sonata_grpc._clear_stale_server_state())
+        asyncio.run(dengjen_grpc._clear_stale_server_state())
 
         assert killed.value
-        assert sonata_grpc.GRPC_SERVER_PROCESS is None
-        assert sonata_grpc.SONATA_GRPC_SERVER_PORT is None
+        assert dengjen_grpc.GRPC_SERVER_PROCESS is None
+        assert dengjen_grpc.DENGJEN_GRPC_SERVER_PORT is None
 
     def test_closes_and_clears_the_channel_and_service(self, monkeypatch):
         import asyncio
@@ -235,14 +235,14 @@ class TestClearStaleServerState:
             async def close(self):
                 closed.value = True
 
-        monkeypatch.setattr(sonata_grpc, "CHANNEL", _FakeChannel())
-        monkeypatch.setattr(sonata_grpc, "SONATA_GRPC_SERVICE", object())
+        monkeypatch.setattr(dengjen_grpc, "CHANNEL", _FakeChannel())
+        monkeypatch.setattr(dengjen_grpc, "DENGJEN_GRPC_SERVICE", object())
 
-        asyncio.run(sonata_grpc._clear_stale_server_state())
+        asyncio.run(dengjen_grpc._clear_stale_server_state())
 
         assert closed.value
-        assert sonata_grpc.CHANNEL is None
-        assert sonata_grpc.SONATA_GRPC_SERVICE is None
+        assert dengjen_grpc.CHANNEL is None
+        assert dengjen_grpc.DENGJEN_GRPC_SERVICE is None
 
     def test_a_channel_that_fails_to_close_does_not_stop_the_rest_of_the_cleanup(
         self, monkeypatch
@@ -258,12 +258,12 @@ class TestClearStaleServerState:
         fake_process = types.SimpleNamespace(
             kill=lambda: setattr(killed, "value", True)
         )
-        monkeypatch.setattr(sonata_grpc, "CHANNEL", _FakeChannel())
-        monkeypatch.setattr(sonata_grpc, "GRPC_SERVER_PROCESS", fake_process)
+        monkeypatch.setattr(dengjen_grpc, "CHANNEL", _FakeChannel())
+        monkeypatch.setattr(dengjen_grpc, "GRPC_SERVER_PROCESS", fake_process)
 
-        asyncio.run(sonata_grpc._clear_stale_server_state())
+        asyncio.run(dengjen_grpc._clear_stale_server_state())
 
-        assert sonata_grpc.CHANNEL is None
+        assert dengjen_grpc.CHANNEL is None
         assert killed.value
 
     def test_clears_the_globalVars_cache(self):
@@ -272,12 +272,12 @@ class TestClearStaleServerState:
 
         import globalVars
 
-        globalVars.SONATA_GRPC_SERVER_PORT = 12345
+        globalVars.DENGJEN_GRPC_SERVER_PORT = 12345
         globalVars.GRPC_SERVER_PROCESS = object()
 
-        asyncio.run(sonata_grpc._clear_stale_server_state())
+        asyncio.run(dengjen_grpc._clear_stale_server_state())
 
-        assert not hasattr(globalVars, "SONATA_GRPC_SERVER_PORT")
+        assert not hasattr(globalVars, "DENGJEN_GRPC_SERVER_PORT")
         assert not hasattr(globalVars, "GRPC_SERVER_PROCESS")
 
     def test_closes_the_server_log_handle(self, monkeypatch):
@@ -288,27 +288,27 @@ class TestClearStaleServerState:
         fake_handle = types.SimpleNamespace(
             close=lambda: setattr(closed, "value", True)
         )
-        monkeypatch.setattr(sonata_grpc, "SERVER_LOG_HANDLE", fake_handle)
+        monkeypatch.setattr(dengjen_grpc, "SERVER_LOG_HANDLE", fake_handle)
 
-        asyncio.run(sonata_grpc._clear_stale_server_state())
+        asyncio.run(dengjen_grpc._clear_stale_server_state())
 
         assert closed.value
-        assert sonata_grpc.SERVER_LOG_HANDLE is None
+        assert dengjen_grpc.SERVER_LOG_HANDLE is None
 
     def test_is_a_noop_when_nothing_is_cached(self, monkeypatch):
         import asyncio
 
         import globalVars
 
-        monkeypatch.setattr(sonata_grpc, "GRPC_SERVER_PROCESS", None)
-        monkeypatch.setattr(sonata_grpc, "SONATA_GRPC_SERVER_PORT", None)
-        monkeypatch.setattr(sonata_grpc, "SERVER_LOG_HANDLE", None)
-        monkeypatch.setattr(sonata_grpc, "CHANNEL", None)
-        monkeypatch.setattr(sonata_grpc, "SONATA_GRPC_SERVICE", None)
-        monkeypatch.delattr(globalVars, "SONATA_GRPC_SERVER_PORT", raising=False)
+        monkeypatch.setattr(dengjen_grpc, "GRPC_SERVER_PROCESS", None)
+        monkeypatch.setattr(dengjen_grpc, "DENGJEN_GRPC_SERVER_PORT", None)
+        monkeypatch.setattr(dengjen_grpc, "SERVER_LOG_HANDLE", None)
+        monkeypatch.setattr(dengjen_grpc, "CHANNEL", None)
+        monkeypatch.setattr(dengjen_grpc, "DENGJEN_GRPC_SERVICE", None)
+        monkeypatch.delattr(globalVars, "DENGJEN_GRPC_SERVER_PORT", raising=False)
         monkeypatch.delattr(globalVars, "GRPC_SERVER_PROCESS", raising=False)
 
-        asyncio.run(sonata_grpc._clear_stale_server_state())
+        asyncio.run(dengjen_grpc._clear_stale_server_state())
 
     def test_a_process_that_refuses_to_die_does_not_stop_the_cleanup(self, monkeypatch):
         import asyncio
@@ -317,11 +317,11 @@ class TestClearStaleServerState:
         fake_process = types.SimpleNamespace(
             kill=lambda: (_ for _ in ()).throw(Exception("access denied"))
         )
-        monkeypatch.setattr(sonata_grpc, "GRPC_SERVER_PROCESS", fake_process)
+        monkeypatch.setattr(dengjen_grpc, "GRPC_SERVER_PROCESS", fake_process)
 
-        asyncio.run(sonata_grpc._clear_stale_server_state())
+        asyncio.run(dengjen_grpc._clear_stale_server_state())
 
-        assert sonata_grpc.GRPC_SERVER_PROCESS is None
+        assert dengjen_grpc.GRPC_SERVER_PROCESS is None
 
 
 def test_check_grpc_server_clears_stale_state_when_the_handshake_fails():
@@ -340,24 +340,25 @@ def test_check_grpc_server_clears_stale_state_when_the_handshake_fails():
     import asyncio
     import types
 
-    import dengjen_neural_voices.adapters.sonata_grpc as mod
+    import dengjen_neural_voices.adapters.dengjen_grpc as mod
 
     killed = types.SimpleNamespace(value=False)
     fake_process = types.SimpleNamespace(kill=lambda: setattr(killed, "value", True))
 
-    orig_get_version = mod.get_sonata_version
+    orig_get_version = mod.get_dengjen_version
     orig_process = mod.GRPC_SERVER_PROCESS
 
     async def _boom():
         raise RuntimeError("connection refused")
 
-    mod.get_sonata_version = _boom
+    mod.get_dengjen_version = _boom
     mod.GRPC_SERVER_PROCESS = fake_process
     try:
+        coro = mod.check_grpc_server()
         with pytest.raises(RuntimeError):
-            asyncio.run(mod.check_grpc_server())
+            asyncio.run(coro)
     finally:
-        mod.get_sonata_version = orig_get_version
+        mod.get_dengjen_version = orig_get_version
         mod.GRPC_SERVER_PROCESS = orig_process
 
     assert killed.value

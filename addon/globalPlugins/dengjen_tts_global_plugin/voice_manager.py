@@ -19,8 +19,8 @@ addonHandler.initTranslation()
 
 from . import (
     DENGJEN_VOICES_DIR,
+    DengjenGrpcBackend,
     DengjenTextToSpeechSystem,
-    SonataGrpcBackend,
     aio,
     helpers,
     voice_download,
@@ -98,7 +98,7 @@ class InstalledDengjenVoicesPanel(SizedPanel):
     def update_voices_list(self, set_focus=False, invalidate_synth_voices_cache=False):
         voices = list(
             DengjenTextToSpeechSystem.load_piper_voices_from_nvda_config_dir(
-                SonataGrpcBackend()
+                DengjenGrpcBackend()
             )
         )
         state = logic.installed_list_state(voices, synthDriverHandler.getSynth().name)

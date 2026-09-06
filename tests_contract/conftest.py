@@ -33,7 +33,7 @@ _SYNTH_PKG_DIR = os.path.join(
 
 LIB_DIRECTORY = os.path.join(_SYNTH_PKG_DIR, "lib")
 BIN_DIRECTORY = os.path.join(_SYNTH_PKG_DIR, "bin")
-GRPC_CLIENT_DIR = os.path.join(_SYNTH_PKG_DIR, "adapters", "sonata_grpc")
+GRPC_CLIENT_DIR = os.path.join(_SYNTH_PKG_DIR, "adapters", "dengjen_grpc")
 GRPC_SERVER_EXE = os.path.join(BIN_DIRECTORY, "dengjen-tts-grpc.exe")
 
 

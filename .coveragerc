@@ -12,5 +12,5 @@ omit =
     site_scons/*
     update_*.py
     addon/synthDrivers/dengjen_neural_voices/lib/*
-    addon/synthDrivers/dengjen_neural_voices/adapters/sonata_grpc/grpc_protos/*
+    addon/synthDrivers/dengjen_neural_voices/adapters/dengjen_grpc/grpc_protos/*
 relative_files = True

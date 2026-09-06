@@ -24,7 +24,7 @@ from logHandler import log
 
 addonHandler.initTranslation()
 
-from . import DENGJEN_VOICES_DIR, DengjenTextToSpeechSystem, SonataGrpcBackend, helpers
+from . import DENGJEN_VOICES_DIR, DengjenGrpcBackend, DengjenTextToSpeechSystem, helpers
 
 with helpers.import_bundled_library():
     from concurrent.futures import ThreadPoolExecutor
@@ -606,7 +606,7 @@ def install_voice_from_tar_archive(tar_path, voices_dir):
 
 def _select_not_installed_voices(voices):
     installed_voices = DengjenTextToSpeechSystem.load_piper_voices_from_nvda_config_dir(
-        SonataGrpcBackend()
+        DengjenGrpcBackend()
     )
     installed_voice_keys = {voice.key for voice in installed_voices}
     not_installed = []

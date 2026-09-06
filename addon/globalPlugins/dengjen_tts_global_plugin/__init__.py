@@ -26,7 +26,7 @@ try:
         helpers,
         voice_migration,
     )
-    from dengjen_neural_voices.adapters.sonata_grpc import SonataGrpcBackend
+    from dengjen_neural_voices.adapters.dengjen_grpc import DengjenGrpcBackend
 finally:
     sys.path.remove(_TTS_MODULE_DIR)
 del _DIR, _ADDON_ROOT, _TTS_MODULE_DIR
@@ -34,8 +34,8 @@ del _DIR, _ADDON_ROOT, _TTS_MODULE_DIR
 
 __all__ = [
     "DENGJEN_VOICES_DIR",
+    "DengjenGrpcBackend",
     "DengjenTextToSpeechSystem",
-    "SonataGrpcBackend",
     "aio",
     "helpers",
     "voice_migration",
@@ -69,7 +69,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             return
         if not any(
             DengjenTextToSpeechSystem.load_piper_voices_from_nvda_config_dir(
-                SonataGrpcBackend()
+                DengjenGrpcBackend()
             )
         ):
             retval = gui.messageBox(

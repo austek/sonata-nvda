@@ -48,22 +48,22 @@ from ...ports.tts_backend import BackendUnavailableError
 addonHandler.initTranslation()
 
 
-def _bootstrap_backend():
+def _bootstrap_backend():  # pragma: no cover
     """Construct and start the production TTS backend.
 
     A module-level function (not inline in SynthDriver.__init__) so tests can
     replace it wholesale via monkeypatch -- NVDA constructs SynthDriver()
     with zero arguments, so the backend cannot be a constructor parameter.
 
-    Imports SonataGrpcBackend lazily: this keeps the vendored, Windows-only
+    Imports DengjenGrpcBackend lazily: this keeps the vendored, Windows-only
     grpc dependency out of every code path that doesn't actually need to talk
     to the engine (in particular, out of every test that monkeypatches this
     function before SynthDriver() is ever constructed).
     """
-    from ..sonata_grpc import SonataGrpcBackend
+    from ..dengjen_grpc import DengjenGrpcBackend
 
     aio.ensure_running()
-    backend = SonataGrpcBackend()
+    backend = DengjenGrpcBackend()
     backend.initialize()
     version = backend.check_version()
     log.info(f"Dengjen GRPC server version: {version}")

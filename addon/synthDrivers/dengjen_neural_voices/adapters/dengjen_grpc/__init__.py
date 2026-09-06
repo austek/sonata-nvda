@@ -78,11 +78,11 @@ with import_bundled_library():
     from .grpc_protos.dengjen_grpc_pb2_grpc import DengjenGrpcStub
 
 
-SONATA_GRPC_SERVER_PORT = None
+DENGJEN_GRPC_SERVER_PORT = None
 GRPC_SERVER_PROCESS = None
 SERVER_LOG_HANDLE = None
 CHANNEL = None
-SONATA_GRPC_SERVICE = None
+DENGJEN_GRPC_SERVICE = None
 SERVER_CHECK_TIMEOUT = 15
 
 
@@ -92,9 +92,9 @@ CHANNEL_CLOSE_TIMEOUT = 5
 
 
 def start_grpc_server():
-    global GRPC_SERVER_PROCESS, SONATA_GRPC_SERVER_PORT, SERVER_LOG_HANDLE
-    if hasattr(globalVars, "SONATA_GRPC_SERVER_PORT"):
-        SONATA_GRPC_SERVER_PORT = globalVars.SONATA_GRPC_SERVER_PORT
+    global GRPC_SERVER_PROCESS, DENGJEN_GRPC_SERVER_PORT, SERVER_LOG_HANDLE
+    if hasattr(globalVars, "DENGJEN_GRPC_SERVER_PORT"):
+        DENGJEN_GRPC_SERVER_PORT = globalVars.DENGJEN_GRPC_SERVER_PORT
         GRPC_SERVER_PROCESS = globalVars.GRPC_SERVER_PROCESS
         return True
     if _vcruntime_missing():
@@ -105,13 +105,13 @@ def start_grpc_server():
         )
         _show_vcruntime_warning()
         return False
-    SONATA_GRPC_SERVER_PORT = find_free_port()
+    DENGJEN_GRPC_SERVER_PORT = find_free_port()
     grpc_server_exe = os.path.join(BIN_DIRECTORY, "dengjen-tts-grpc.exe")
     nvda_espeak_dir = os.path.join(globalVars.appDir, "synthDrivers")
     env = os.environ.copy()
     env.update(
         {
-            "DENGJEN_GRPC_SERVER_PORT": str(SONATA_GRPC_SERVER_PORT),
+            "DENGJEN_GRPC_SERVER_PORT": str(DENGJEN_GRPC_SERVER_PORT),
             "DENGJEN_ESPEAKNG_DATA_DIRECTORY": os.fspath(nvda_espeak_dir),
             "DENGJEN_GRPC": "info",
         }
@@ -148,14 +148,14 @@ def start_grpc_server():
             SERVER_LOG_HANDLE.close()
             SERVER_LOG_HANDLE = None
         return False
-    globalVars.SONATA_GRPC_SERVER_PORT = SONATA_GRPC_SERVER_PORT
+    globalVars.DENGJEN_GRPC_SERVER_PORT = DENGJEN_GRPC_SERVER_PORT
     globalVars.GRPC_SERVER_PROCESS = GRPC_SERVER_PROCESS
     return True
 
 
 @aio.asyncio_coroutine_to_concurrent_future
 async def initialize():
-    global CHANNEL, SONATA_GRPC_SERVICE
+    global CHANNEL, DENGJEN_GRPC_SERVICE
     if not start_grpc_server():
         raise RuntimeError("Failed to start the Dengjen GRPC server")
     if CHANNEL is not None:
@@ -173,9 +173,9 @@ async def initialize():
         except Exception:
             log.debug("Failed to close the stale GRPC channel", exc_info=True)
         CHANNEL = None
-    port = SONATA_GRPC_SERVER_PORT
+    port = DENGJEN_GRPC_SERVER_PORT
     CHANNEL = grpc.aio.insecure_channel(f"localhost:{port}")
-    SONATA_GRPC_SERVICE = DengjenGrpcStub(CHANNEL)
+    DENGJEN_GRPC_SERVICE = DengjenGrpcStub(CHANNEL)
 
 
 def close_channel():
@@ -203,8 +203,8 @@ def close_channel():
 
 @atexit.register
 def terminate():
-    global GRPC_SERVER_PROCESS, SONATA_GRPC_SERVER_PORT, SERVER_LOG_HANDLE
-    SONATA_GRPC_SERVER_PORT = None
+    global GRPC_SERVER_PROCESS, DENGJEN_GRPC_SERVER_PORT, SERVER_LOG_HANDLE
+    DENGJEN_GRPC_SERVER_PORT = None
     try:
         close_channel()
         aio.terminate()
@@ -229,7 +229,7 @@ async def _clear_stale_server_state():
     call would keep reusing the same dead process and port forever, since
     its cache check only looks at presence, not health.
 
-    Also clears CHANNEL/SONATA_GRPC_SERVICE: initialize() reuses a cached
+    Also clears CHANNEL/DENGJEN_GRPC_SERVICE: initialize() reuses a cached
     CHANNEL outright when its loop still matches the running one, without
     checking which port it was opened against -- leaving those set would
     have every later RPC call reconnect to the dead port's channel even
@@ -245,21 +245,21 @@ async def _clear_stale_server_state():
     """
     global \
         GRPC_SERVER_PROCESS, \
-        SONATA_GRPC_SERVER_PORT, \
+        DENGJEN_GRPC_SERVER_PORT, \
         SERVER_LOG_HANDLE, \
         CHANNEL, \
-        SONATA_GRPC_SERVICE
+        DENGJEN_GRPC_SERVICE
     process, GRPC_SERVER_PROCESS = GRPC_SERVER_PROCESS, None
-    SONATA_GRPC_SERVER_PORT = None
-    SONATA_GRPC_SERVICE = None
+    DENGJEN_GRPC_SERVER_PORT = None
+    DENGJEN_GRPC_SERVICE = None
     channel, CHANNEL = CHANNEL, None
     if channel is not None:
         try:
             await channel.close()
         except Exception:
             log.debug("Failed to close the stale GRPC channel", exc_info=True)
-    if hasattr(globalVars, "SONATA_GRPC_SERVER_PORT"):
-        del globalVars.SONATA_GRPC_SERVER_PORT
+    if hasattr(globalVars, "DENGJEN_GRPC_SERVER_PORT"):
+        del globalVars.DENGJEN_GRPC_SERVER_PORT
     if hasattr(globalVars, "GRPC_SERVER_PROCESS"):
         del globalVars.GRPC_SERVER_PROCESS
     if process is not None:
@@ -276,27 +276,27 @@ async def _clear_stale_server_state():
 async def check_grpc_server() -> str:
     try:
         async with asyncio.timeout(SERVER_CHECK_TIMEOUT):
-            return await get_sonata_version()
+            return await get_dengjen_version()
     except Exception:
         await _clear_stale_server_state()
         raise
 
 
-async def get_sonata_version():
-    resp = await SONATA_GRPC_SERVICE.GetDengjenVersion(msgs.Empty())
+async def get_dengjen_version():
+    resp = await DENGJEN_GRPC_SERVICE.GetDengjenVersion(msgs.Empty())
     return resp.version
 
 
 @aio.asyncio_coroutine_to_concurrent_future
 async def load_voice(config_path):
     req = msgs.VoiceConfigLocation(path=config_path)
-    return await SONATA_GRPC_SERVICE.LoadVoice(req)
+    return await DENGJEN_GRPC_SERVICE.LoadVoice(req)
 
 
 @aio.asyncio_coroutine_to_concurrent_future
 async def get_synth_options(voice_id):
     req = msgs.VoiceRef(voice_key=voice_id)
-    return await SONATA_GRPC_SERVICE.GetSynthesisOptions(req)
+    return await DENGJEN_GRPC_SERVICE.GetSynthesisOptions(req)
 
 
 @aio.asyncio_coroutine_to_concurrent_future
@@ -312,7 +312,7 @@ async def set_synth_options(
             noise_w=noise_w,
         ),
     )
-    return await SONATA_GRPC_SERVICE.SetSynthesisOptions(req)
+    return await DENGJEN_GRPC_SERVICE.SetSynthesisOptions(req)
 
 
 async def speak(
@@ -338,9 +338,9 @@ async def speak(
         prosody=speech_args,
     )
     if streaming:
-        stream = SONATA_GRPC_SERVICE.SynthesizeUtteranceRealtime
+        stream = DENGJEN_GRPC_SERVICE.SynthesizeUtteranceRealtime
     else:
-        stream = SONATA_GRPC_SERVICE.SynthesizeUtterance
+        stream = DENGJEN_GRPC_SERVICE.SynthesizeUtterance
     async for ret in stream(utterance):
         yield ret
 
@@ -349,11 +349,11 @@ async def bench(n=10000):
     initialize()
     t0 = time.perf_counter()
     for _ in range(n):
-        await get_sonata_version()
+        await get_dengjen_version()
     return time.perf_counter() - t0
 
 
-class SonataGrpcBackend:
+class DengjenGrpcBackend:
     """TTSBackend adapter over this module's process-wide gRPC client state.
 
     A thin facade: the gRPC channel and dengjen-tts-grpc.exe subprocess are

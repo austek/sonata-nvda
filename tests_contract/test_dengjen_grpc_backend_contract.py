@@ -1,5 +1,5 @@
 """
-Contract test for SonataGrpcBackend against the real, vendored
+Contract test for DengjenGrpcBackend against the real, vendored
 dengjen-tts-grpc.exe. Unlike test_grpc_contract.py (which talks to the raw
 protobuf stub directly, bypassing any Python wrapper by design), this
 exercises the actual TTSBackend adapter production code will call --
@@ -66,7 +66,7 @@ _dengjen_pkg.__path__ = [_SYNTH_PKG_DIR]
 sys.modules.setdefault("dengjen_neural_voices", _dengjen_pkg)
 
 from dengjen_neural_voices import aio
-from dengjen_neural_voices.adapters.sonata_grpc import SonataGrpcBackend
+from dengjen_neural_voices.adapters.dengjen_grpc import DengjenGrpcBackend
 
 VOICE_KEY = "vi_VN-vivos-x_low"
 VOICE_FILES_BASE_URL = (
@@ -96,13 +96,13 @@ def downloaded_voice(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def backend():
-    b = SonataGrpcBackend()
+    b = DengjenGrpcBackend()
     b.initialize()
     yield b
     b.shutdown()
 
 
-class TestSonataGrpcBackendContract:
+class TestDengjenGrpcBackendContract:
     def test_check_version_returns_a_non_empty_string(self, backend):
         version = backend.check_version()
         assert isinstance(version, str)
