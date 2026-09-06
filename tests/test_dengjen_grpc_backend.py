@@ -196,8 +196,8 @@ def test_synthesize_yields_audio_bytes_not_the_raw_message():
 
 class TestClearStaleServerState:
     """_clear_stale_server_state() is the recovery path for a server that
-    Popen'd successfully but never became reachable (e.g. lost the
-    find_free_port()-to-bind race to another process) -- without it, every
+    Popen'd successfully but never became reachable (e.g. crashed after
+    binding, or hung before answering RPCs) -- without it, every
     later start_grpc_server()/initialize() call would keep reusing the same
     dead process, port and channel forever, since their cache checks only
     look at presence, not health.
